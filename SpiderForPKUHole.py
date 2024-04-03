@@ -18,26 +18,34 @@ import re
 # 需配置webdriver(chromedriver)文件，可自行按照chrome版本下载之后拖入/usr/local/bin
 # 终端输入pip3 install selenium或者升级:pip3 install selenium --upgrade
 
+username = str(input("学号："))
+password = str(input("密码："))
 numLog = str(input("是否获取每条信息的编号？获取请输入y，不获取则任意输入非y内容："))
 nameLog = str(input("是否获取每条信息的发帖人代称？不获取请输入n，获取则任意输入非n内容："))
 collectBool = str(input("是否为获取收藏夹内容？获取请输入y，不获取则任意输入非y内容："))
 google = webdriver.Chrome()
-url = "https://pkuhelper.pku.edu.cn/hole/"
+
+url = "https://treehole.pku.edu.cn/web/"
 google.get(url)
+
 # 伪造人工登陆
-# 定位登陆按钮
-login1 = google.find_element(By.XPATH, "//*[@id='root']/div[4]/div[2]/div/p")
-login1.click()
-# 定位token输入框
-login2 = google.find_element(
-    By.XPATH, "//*[@id='pkuhelper_login_popup_anchor']/div/div[2]/p[6]/input")
-# 此处填入从设置处获取的登陆Token
-login2.send_keys("********************************")
-# 定位登陆按钮
-login3 = google.find_element(
-    By.XPATH, "//*[@id='pkuhelper_login_popup_anchor']/div/div[2]/p[6]/button")
-login3.click()
-time.sleep(5)
+# 定位账号输入框
+username_input = google.find_element(By.XPATH, "//input[@type='text']")
+# 定位密码输入框
+password_input = google.find_element(By.XPATH, "//input[@type='password']")
+
+# 输入账号和密码
+username_input.send_keys(username)
+password_input.send_keys(password)
+# 定位到同意服务协议的复选框并点击以打勾
+# 注意，这里假设页面上只有这一个复选框
+google.find_element(By.XPATH, "//input[@type='checkbox']").click()
+
+# 定位登录按钮并点击
+# 这里假设登录按钮是页面上唯一的按钮元素，或者是文本明确标识为“登录”的唯一按钮
+google.find_element(By.XPATH, "//button[contains(text(),'登录')]").click()
+# 为输入验证码空出时间
+time.sleep(30)
 
 # 判断是否为获取收藏夹
 if collectBool == "y":
@@ -75,7 +83,7 @@ for i in range(1, 201):
 box_content = google.find_elements(By.CLASS_NAME, "box-content")
 box_header = google.find_elements(By.CLASS_NAME, "box-header")
 # 此处填入目标txt文件地址,Ex."/Users/zhuozhiyongde/Desktop/Essay.txt"
-log = open("/Users/zhuozhiyongde/Desktop/Essay.txt", "w+", encoding="UTF-8")
+log = open("./output", "w+", encoding="UTF-8")
 sum = 0
 for option in range(len(box_content)):
     header = box_header[option].get_attribute('textContent')
