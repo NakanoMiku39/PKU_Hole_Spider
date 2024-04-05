@@ -1,3 +1,64 @@
+## **Forked from https://github.com/zhuozhiyongde/PKU_Hole_Spider**  
+2024-04-04
+- **由于树洞进行了一次更新，导致爬虫不可用，于是基于该项目进行翻新，并贴合自己的需求**  
+
+2024-04-05
+- 初步完成基本功能
+
+# 说明
+- 该项目使用Selenium进行树洞爬取，sqlite3保存爬取数据  
+- 数据被分成两类保存，一类是洞本身(topics表），另一类是洞的回复(replies表)，每个洞的回复都有与之对应的洞号作为外键
+
+# Usage
+1. 安装Chrome和Chromedriver
+2. 安装依赖
+3. 配置config.ini
+4. 运行脚本
+
+## 安装Chrome和Chromedriver
+请自行百度如何安装，确保Chrome的版本与Chromedriver兼容  
+本人版本如下：  
+Google Chrome 123.0.6312.86  
+ChromeDriver 123.0.6312.8
+
+## 安装依赖
+运行以下指令安装项目依赖
+```bash
+pip install -r requirements.txt
+```
+
+## 配置config.ini
+config.ini目前有三个必填项，请复制config-sample.ini并改名为config.ini后改动配置  
+示例：
+```ini
+[User]
+username = 2100012345
+password = yourpasswordhere
+entries = 50
+```
+这个配置将会使用`2100012345`作为学号输入和`yourpasswordhere`作为密码输入，然后爬取`50`条树洞
+
+## 运行脚本
+完成上述所有操作后运行`SpiderForPKUHole.py`即可  
+```
+python3 SpiderForPKUHole.py
+```
+
+# 其他
+1. 代码中包含了以下内容
+```python
+options.add_argument(r"user-data-dir=/home/nakanomiku/.config/google-chrome") # 请更改为自己的cache路径
+```
+这行代码的作用是从`/home/nakanomiku/.config/google-chrome`读取本地Chrome缓存，这可以避免Selenium每次登录树洞时需要验证码登录，请根据自身情况调整该路径  
+
+2. 如果此前没有在Chrome上登陆过树洞，会导致没有本地缓存，此时需要本人亲自输入验证码完成验证  
+
+3. 一天内最多可以接收五次验证码，超出数量后需要等到第二天，所以强烈建议配置好本地Chrome缓存路径
+
+4. 目前暂不支持无头爬取
+
+--- 
+
 <div align="center">
   <img src="https://i.loli.net/2021/11/23/cJSdpBsxDMeUvHq.png"><img/>
   
