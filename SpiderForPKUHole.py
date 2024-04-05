@@ -49,10 +49,7 @@ entries = config['User']['entries'] # # 希望爬取的树洞数
 # 需配置webdriver(chromedriver)文件，可自行按照chrome版本下载之后拖入/usr/local/bin
 # 终端输入pip3 install selenium或者升级:pip3 install selenium --upgrade
 options = Options()
-options.add_argument(r"user-data-dir=/home/nakanomiku/.config/google-chrome")
-# numLog = str(input("是否获取每条信息的编号？获取请输入y，不获取则任意输入非y内容："))
-# nameLog = str(input("是否获取每条信息的发帖人代称？不获取请输入n，获取则任意输入非n内容："))
-# collectBool = str(input("是否为获取收藏夹内容？获取请输入y，不获取则任意输入非y内容："))
+options.add_argument(r"user-data-dir=/home/nakanomiku/.config/google-chrome") # 请更改为自己的cache路径
 google = webdriver.Chrome(options=options)
 
 url = "https://treehole.pku.edu.cn/web/"
@@ -96,7 +93,6 @@ action = ActionChains(google)
 google.find_element(By.XPATH, "//div[contains(@class,'title-bar')]").click()
 # 判断是否能爬取到指定数量的树洞，如果不能就继续往下滑动
 while len(flow_items) < int(entries):
-    print("Scrolling...")
     google.execute_script("window.scrollBy(0, 1000);")
     action.send_keys(Keys.ARROW_DOWN).perform()  # 模拟按下 Page Down 键
     flow_items = google.find_elements(By.XPATH, "//div[contains(@class,'flow-item-row flow-item-row-with-prompt')]")
@@ -111,13 +107,21 @@ for flow_item in flow_items:
     EC.presence_of_element_located((By.XPATH, "//div[contains(@class,'sidebar')]"))
     )
     
-    # 查找树洞内容
-    print("Start searching for sidebar's elements")
+    # 获取指定数量树洞
     box_headers_in_sidebar = sidebar.find_elements(By.XPATH, "//div[contains(@class,'box-header box-header-top-icon')]")
+    codes_in_sidebar = sidebar.find_elements(By.CLASS_NAME, "box-id")
     box_contents_in_sidebar = sidebar.find_elements(By.XPATH, "//div[contains(@class,'box-content box-content-detail')]")
-    for box_header, box_content in zip(box_headers_in_sidebar, box_contents_in_sidebar):
-        print(f"Header Text: {box_header.text}")
-        print(f"Content Text: {box_content.text}")    
+    # 迭代洞中的每一条内容
+    for index, (code, box_content) in enumerate(zip(codes_in_sidebar, box_contents_in_sidebar)):
+        # 当前洞/回复号
+        code = int(code.text[1:])
+        if index == 0:
+            c.execute("INSERT INTO topics (id, content) VALUES (?, ?)", (code, box_content.text))
+        else:
+            c.execute("INSERT INTO replies (id, content, topic_id) VALUES (?, ?, ?)", (code, box_content.text, int(codes_in_sidebar[0].text[1:])))
+        
+        # print(f"Header Text: {code}")
+        # print(f"Content Text: {box_content.text}")    
             
     # 关闭sidebar
     close = sidebar.find_element(By.CSS_SELECTOR, "span.icon.icon-close") 
