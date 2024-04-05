@@ -8,15 +8,31 @@
 from selenium import webdriver
 from selenium.webdriver.support.relative_locator import locate_with
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import os
-import os.path
 import re
-import selenium
+import sqlite3
 import configparser
 import time
+
+########## SETUPS ##########
+# 创建或打开数据库
+conn = sqlite3.connect('forum.db')
+c = conn.cursor()
+
+# 创建topics表
+c.execute('''CREATE TABLE IF NOT EXISTS topics
+             (id INTEGER PRIMARY KEY, content TEXT)''')
+
+# 创建replies表，包含一个外键指向topics的id
+c.execute('''CREATE TABLE IF NOT EXISTS replies
+             (id INTEGER PRIMARY KEY, content TEXT, topic_id INTEGER,
+             FOREIGN KEY(topic_id) REFERENCES topics(id))''')
 
 # 创建ConfigParser对象
 config = configparser.ConfigParser()
@@ -25,8 +41,9 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 # 读取特定节（section）的配置信息
-username = config['User']['username']
-password = config['User']['password']
+username = config['User']['username'] # 学号
+password = config['User']['password'] # 密码
+entries = config['User']['entries'] # # 希望爬取的树洞数
 
 # 需安装selenium库4.0.0以上版本
 # 需配置webdriver(chromedriver)文件，可自行按照chrome版本下载之后拖入/usr/local/bin
@@ -39,12 +56,15 @@ options.add_argument(r"user-data-dir=/home/nakanomiku/.config/google-chrome")
 google = webdriver.Chrome(options=options)
 
 url = "https://treehole.pku.edu.cn/web/"
-google.get(url)
 
+############################
+
+google.get(url)
+time.sleep(5)
 # 伪造人工登陆
-# 定位账号输入框
 if "login" in google.current_url: 
     print("Login required")
+# 定位账号输入框
     username_input = google.find_element(By.XPATH, "//input[@type='text']")
     # 定位密码输入框
     password_input = google.find_element(By.XPATH, "//input[@type='password']")
@@ -61,77 +81,59 @@ if "login" in google.current_url:
     # 定位登录按钮并点击
     # 这里假设登录按钮是页面上唯一的按钮元素，或者是文本明确标识为“登录”的唯一按钮
     google.find_element(By.XPATH, "//button[contains(text(),'登录')]").click()
+    time.sleep(5)
     # 为输入验证码空出时间
-    time.sleep(60)
+    if "login" in google.current_url:
+        time.sleep(30)
+        
+print("Logged in")
 
-# 判断是否为获取收藏夹
-# if collectBool == "y":
-#     login4 = google.find_element(
-#         By.XPATH, "//*[@id='root']/div[3]/div[2]/div[2]/a[2]/span[1]")
-#     login4.click()
+# 定位所有的 flow-item-row flow-item-row-with-prompt 元素
+# 也就是树洞
+flow_items = google.find_elements(By.XPATH, "//div[contains(@class,'flow-item-row flow-item-row-with-prompt')]")
+action = ActionChains(google)
+# 点击是为了确保之后的ARROW_DOWN能正常下滑窗口
+google.find_element(By.XPATH, "//div[contains(@class,'title-bar')]").click()
+# 判断是否能爬取到指定数量的树洞，如果不能就继续往下滑动
+while len(flow_items) < int(entries):
+    print("Scrolling...")
+    google.execute_script("window.scrollBy(0, 1000);")
+    action.send_keys(Keys.ARROW_DOWN).perform()  # 模拟按下 Page Down 键
+    flow_items = google.find_elements(By.XPATH, "//div[contains(@class,'flow-item-row flow-item-row-with-prompt')]")
 
-time.sleep(2)
-
-# 开始不断下拉，直到达到限制，利用每次下滑到xmcp就自动刷新的特性
-# 不必再增加循环次数，目前已能达到刷取限制(约为3000条树洞)
-for i in range(1, 5):
-    try:
-        # 定位xmcp，拉入视图中，触发刷新
-        # target = google.find_element(By.XPATH,
-        #                              "//*[@id='root']/div[4]/div[2]/p")
-        # google.execute_script("arguments[0].scrollIntoView();", target)
-        google.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-
-        try:
-            # 点击可能出现的重新加载
-            reload = google.find_element(
-                By.XPATH, "//*[@id='root']/div[4]/div[2]/div[2]/div/p[1]/a")
-            reload.click()
-            print("遇到重新加载，请检查网络连接，目前程序仍在继续")
-        except:
-            # 记录刷取进度
-            if i % 20 == 0:
-                print("刷取进度：", i / 2, "% \t",
-                      time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-        time.sleep(2)
-    except:
-        print("Error:", i)
-        continue
-
-# 开始录入
-box_content = google.find_elements(By.CLASS_NAME, "box-content")
-box_header = google.find_elements(By.CLASS_NAME, "box-header")
-
-# 寻找所有位于 flow-item 下的 box-content 和 box-header
-box_header_in_flow_item = google.find_elements(By.XPATH, "//div[@class='flow-item']//div[@class='box-header']")
-box_content_in_flow_item = google.find_elements(By.XPATH, "//div[@class='flow-item']//div[@class='box-content']")
-
-# 寻找所有位于 flow-reply-row 下的 box-content 和 box-header
-box_header_in_flow_reply_row = google.find_elements(By.XPATH, "//div[@class='flow-reply-row']//div[@class='box-header']")
-box_content_in_flow_reply_row = google.find_elements(By.XPATH, "//div[@class='flow-reply-row']//div[@class='box-content']")
-
-# 输出找到的元素数量，以此来判断是否存在于指定的父元素下
-print(f"Found {len(box_content_in_flow_item)} 'box-content' elements under 'flow-item'.")
-print(f"Found {len(box_header_in_flow_item)} 'box-header' elements under 'flow-item'.")
-print(f"Found {len(box_content_in_flow_reply_row)} 'box-content' elements under 'flow-reply-row'.")
-print(f"Found {len(box_header_in_flow_reply_row)} 'box-header' elements under 'flow-reply-row'.")
+# 爬取
+for flow_item in flow_items:
+    # 打开每一条树洞的sidebar
+    flow_item.click()
+    # 等待sidebar加载出来
+    time.sleep(1)
+    sidebar = WebDriverWait(google, 10).until(
+    EC.presence_of_element_located((By.XPATH, "//div[contains(@class,'sidebar')]"))
+    )
+    
+    # 查找树洞内容
+    print("Start searching for sidebar's elements")
+    box_headers_in_sidebar = sidebar.find_elements(By.XPATH, "//div[contains(@class,'box-header box-header-top-icon')]")
+    box_contents_in_sidebar = sidebar.find_elements(By.XPATH, "//div[contains(@class,'box-content box-content-detail')]")
+    for box_header, box_content in zip(box_headers_in_sidebar, box_contents_in_sidebar):
+        print(f"Header Text: {box_header.text}")
+        print(f"Content Text: {box_content.text}")    
+            
+    # 关闭sidebar
+    close = sidebar.find_element(By.CSS_SELECTOR, "span.icon.icon-close") 
+    close.click()
+    time.sleep(1)
+    
+print("Total entries: %d" % len(flow_items))
 
 # 此处填入目标txt文件地址,Ex."/Users/zhuozhiyongde/Desktop/Essay.txt"
-log = open("./output", "w+", encoding="UTF-8")
-sum = 0
-for option in range(len(box_content)):
-    main_header = box_header_in_flow_item[option].get_attribute('textContent')
-    main_text = box_content_in_flow_item[option].get_attribute('textContent')
-    reply_header = box_header_in_flow_reply_row[option].get_attribute('textContent')
-    reply_text = box_content_in_flow_reply_row[option].get_attribute('textContent')
-    code = re.search("#2\d+", main_header)
-    code = re.search("#2\d+", reply_header)
-    print(code)
-    print(main_header)
-    print(main_text)
-    print("Reply")
-    print(reply_header)
-    print(reply_text)
+    # for option in range(len(box_header_in_flow_item)):
+        
+    #     # 插入一个主题
+    #     c.execute("INSERT INTO topics (id, content) VALUES (?, ?)", (code.group(1), main_text))
+    #     replies = [i for i in reply_text]
+    # c.executemany("INSERT INTO replies (id, content, topic_id) VALUES (?, ?, ?)", (replies, code.group(1)))
+    
     #匹配树洞编号
     # num = re.search("#2\d+", header)
     # if num:
@@ -160,10 +162,16 @@ for option in range(len(box_content)):
     # log.write(text + "\n")
     # sum = sum + 1
     # 打印录入条目，每一百条打印一次
-    if sum % 100 == 0:
-        print("当前已录入：", sum, "条\t进度：",
-              "%.2f" % (sum / (len(box_content)) * 100), "%")
-print("总计录入：", sum, "条")
+    # if sum % 100 == 0:
+    #     print("当前已录入：", sum, "条\t进度：",
+    #           "%.2f" % (sum / (len(box_content)) * 100), "%")
+# print("总计录入：", sum, "条")
+
+# 提交事务
+conn.commit()
+# 关闭连接
+conn.close()
+
 # 退出程序
-log.close()
+# log.close()
 google.quit()
