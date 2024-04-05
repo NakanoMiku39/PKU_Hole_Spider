@@ -8,61 +8,80 @@
 from selenium import webdriver
 from selenium.webdriver.support.relative_locator import locate_with
 from selenium.webdriver.common.by import By
-import selenium
-import time
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import os
 import os.path
 import re
+import selenium
+import configparser
+import time
+
+# 创建ConfigParser对象
+config = configparser.ConfigParser()
+
+# 读取INI文件
+config.read('config.ini')
+
+# 读取特定节（section）的配置信息
+username = config['User']['username']
+password = config['User']['password']
 
 # 需安装selenium库4.0.0以上版本
 # 需配置webdriver(chromedriver)文件，可自行按照chrome版本下载之后拖入/usr/local/bin
 # 终端输入pip3 install selenium或者升级:pip3 install selenium --upgrade
-
-username = str(input("学号："))
-password = str(input("密码："))
-numLog = str(input("是否获取每条信息的编号？获取请输入y，不获取则任意输入非y内容："))
-nameLog = str(input("是否获取每条信息的发帖人代称？不获取请输入n，获取则任意输入非n内容："))
-collectBool = str(input("是否为获取收藏夹内容？获取请输入y，不获取则任意输入非y内容："))
-google = webdriver.Chrome()
+options = Options()
+options.add_argument(r"user-data-dir=/home/nakanomiku/.config/google-chrome")
+# numLog = str(input("是否获取每条信息的编号？获取请输入y，不获取则任意输入非y内容："))
+# nameLog = str(input("是否获取每条信息的发帖人代称？不获取请输入n，获取则任意输入非n内容："))
+# collectBool = str(input("是否为获取收藏夹内容？获取请输入y，不获取则任意输入非y内容："))
+google = webdriver.Chrome(options=options)
 
 url = "https://treehole.pku.edu.cn/web/"
 google.get(url)
 
 # 伪造人工登陆
 # 定位账号输入框
-username_input = google.find_element(By.XPATH, "//input[@type='text']")
-# 定位密码输入框
-password_input = google.find_element(By.XPATH, "//input[@type='password']")
+if "login" in google.current_url: 
+    print("Login required")
+    username_input = google.find_element(By.XPATH, "//input[@type='text']")
+    # 定位密码输入框
+    password_input = google.find_element(By.XPATH, "//input[@type='password']")
 
-# 输入账号和密码
-username_input.send_keys(username)
-password_input.send_keys(password)
-# 定位到同意服务协议的复选框并点击以打勾
-# 注意，这里假设页面上只有这一个复选框
-google.find_element(By.XPATH, "//input[@type='checkbox']").click()
+    # 输入账号和密码
+    if not username_input.get_attribute("value"):
+        username_input.send_keys(username)
+    if not password_input.get_attribute("value"):
+        password_input.send_keys(password)
+    # 定位到同意服务协议的复选框并点击以打勾
+    # 注意，这里假设页面上只有这一个复选框
+    google.find_element(By.XPATH, "//input[@type='checkbox']").click()
 
-# 定位登录按钮并点击
-# 这里假设登录按钮是页面上唯一的按钮元素，或者是文本明确标识为“登录”的唯一按钮
-google.find_element(By.XPATH, "//button[contains(text(),'登录')]").click()
-# 为输入验证码空出时间
-time.sleep(30)
+    # 定位登录按钮并点击
+    # 这里假设登录按钮是页面上唯一的按钮元素，或者是文本明确标识为“登录”的唯一按钮
+    google.find_element(By.XPATH, "//button[contains(text(),'登录')]").click()
+    # 为输入验证码空出时间
+    time.sleep(60)
 
 # 判断是否为获取收藏夹
-if collectBool == "y":
-    login4 = google.find_element(
-        By.XPATH, "//*[@id='root']/div[3]/div[2]/div[2]/a[2]/span[1]")
-    login4.click()
+# if collectBool == "y":
+#     login4 = google.find_element(
+#         By.XPATH, "//*[@id='root']/div[3]/div[2]/div[2]/a[2]/span[1]")
+#     login4.click()
 
 time.sleep(2)
 
 # 开始不断下拉，直到达到限制，利用每次下滑到xmcp就自动刷新的特性
 # 不必再增加循环次数，目前已能达到刷取限制(约为3000条树洞)
-for i in range(1, 201):
+for i in range(1, 5):
     try:
         # 定位xmcp，拉入视图中，触发刷新
-        target = google.find_element(By.XPATH,
-                                     "//*[@id='root']/div[4]/div[2]/p")
-        google.execute_script("arguments[0].scrollIntoView();", target)
+        # target = google.find_element(By.XPATH,
+        #                              "//*[@id='root']/div[4]/div[2]/p")
+        # google.execute_script("arguments[0].scrollIntoView();", target)
+        google.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
         try:
             # 点击可能出现的重新加载
             reload = google.find_element(
@@ -82,38 +101,64 @@ for i in range(1, 201):
 # 开始录入
 box_content = google.find_elements(By.CLASS_NAME, "box-content")
 box_header = google.find_elements(By.CLASS_NAME, "box-header")
+
+# 寻找所有位于 flow-item 下的 box-content 和 box-header
+box_header_in_flow_item = google.find_elements(By.XPATH, "//div[@class='flow-item']//div[@class='box-header']")
+box_content_in_flow_item = google.find_elements(By.XPATH, "//div[@class='flow-item']//div[@class='box-content']")
+
+# 寻找所有位于 flow-reply-row 下的 box-content 和 box-header
+box_header_in_flow_reply_row = google.find_elements(By.XPATH, "//div[@class='flow-reply-row']//div[@class='box-header']")
+box_content_in_flow_reply_row = google.find_elements(By.XPATH, "//div[@class='flow-reply-row']//div[@class='box-content']")
+
+# 输出找到的元素数量，以此来判断是否存在于指定的父元素下
+print(f"Found {len(box_content_in_flow_item)} 'box-content' elements under 'flow-item'.")
+print(f"Found {len(box_header_in_flow_item)} 'box-header' elements under 'flow-item'.")
+print(f"Found {len(box_content_in_flow_reply_row)} 'box-content' elements under 'flow-reply-row'.")
+print(f"Found {len(box_header_in_flow_reply_row)} 'box-header' elements under 'flow-reply-row'.")
+
 # 此处填入目标txt文件地址,Ex."/Users/zhuozhiyongde/Desktop/Essay.txt"
 log = open("./output", "w+", encoding="UTF-8")
 sum = 0
 for option in range(len(box_content)):
-    header = box_header[option].get_attribute('textContent')
+    main_header = box_header_in_flow_item[option].get_attribute('textContent')
+    main_text = box_content_in_flow_item[option].get_attribute('textContent')
+    reply_header = box_header_in_flow_reply_row[option].get_attribute('textContent')
+    reply_text = box_content_in_flow_reply_row[option].get_attribute('textContent')
+    code = re.search("#2\d+", main_header)
+    code = re.search("#2\d+", reply_header)
+    print(code)
+    print(main_header)
+    print(main_text)
+    print("Reply")
+    print(reply_header)
+    print(reply_text)
     #匹配树洞编号
-    num = re.search("#2\d+", header)
-    if num:
-        # 判断是否需要抓取树洞编号
-        if numLog == "y":
-            serial = num.group()
-            log.write("--------\n" + serial + "\n")
-        # 不抓取的时，仅录入分隔符
-        # 某些远古洞可能误判为包含原始树洞号，被误加分隔符，但整体错误率较低
-        else:
-            log.write("--------\n")
-    # 判断是否需要删去代称
-    if nameLog == "n":
-        text = box_content[option].get_attribute('textContent')
+    # num = re.search("#2\d+", header)
+    # if num:
+    #     # 判断是否需要抓取树洞编号
+    #     if numLog == "y":
+    #         serial = num.group()
+    #         log.write("--------\n" + serial + "\n")
+    #     # 不抓取的时，仅录入分隔符
+    #     # 某些远古洞可能误判为包含原始树洞号，被误加分隔符，但整体错误率较低
+    #     else:
+    #         log.write("--------\n")
+    # # 判断是否需要删去代称
+    # if nameLog == "n":
+    #     text = box_content[option].get_attribute('textContent')
 
-        # 匹配第一个代称
-        nameRe = re.match("\[\S+\] ", text)
-        if nameRe:
-            text = text.lstrip(nameRe.group())
-        # 匹配Re代称
-        reRe = re.match("Re \S+ ", text)
-        if reRe:
-            text = text.lstrip(reRe.group())
-    else:
-        text = box_content[option].get_attribute('textContent')
-    log.write(text + "\n")
-    sum = sum + 1
+    #     # 匹配第一个代称
+    #     nameRe = re.match("\[\S+\] ", text)
+    #     if nameRe:
+    #         text = text.lstrip(nameRe.group())
+    #     # 匹配Re代称
+    #     reRe = re.match("Re \S+ ", text)
+    #     if reRe:
+    #         text = text.lstrip(reRe.group())
+    # else:
+    #     text = box_content[option].get_attribute('textContent')
+    # log.write(text + "\n")
+    # sum = sum + 1
     # 打印录入条目，每一百条打印一次
     if sum % 100 == 0:
         print("当前已录入：", sum, "条\t进度：",
