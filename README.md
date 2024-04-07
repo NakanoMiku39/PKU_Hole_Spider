@@ -5,6 +5,10 @@
 2024-04-05
 - 初步完成基本功能
 
+2024-04-07
+- 更改爬虫框架
+- 实现实时爬洞功能
+
 # 说明
 - 该项目使用Selenium进行树洞爬取，sqlite3保存爬取数据  
 - 数据被分成两类保存，一类是洞本身(topics表），另一类是洞的回复(replies表)，每个洞的回复都有与之对应的洞号作为外键
@@ -28,20 +32,23 @@ pip install -r requirements.txt
 ```
 
 ## 配置config.ini
-config.ini目前有三个必填项，请复制config-sample.ini并改名为config.ini后改动配置  
+config.ini目前有四个必填项，请复制config-sample.ini并改名为config.ini后改动配置  
+在username填入你的学号，password填入你的密码，entries填入你想爬取的树洞条数，mode填入crawl（正常模式）或realtime（实时爬取模式）  
 示例：
 ```ini
 [User]
 username = 2100012345
 password = yourpasswordhere
 entries = 50
+mode = crawl
 ```
-这个配置将会使用`2100012345`作为学号输入和`yourpasswordhere`作为密码输入，然后爬取`50`条树洞
+这个配置将会使用`2100012345`作为学号输入和`yourpasswordhere`作为密码输入，然后爬取`50`条树洞  
+### 目前在使用realtime模式的时候不会被entries限制爬取条数
 
 ## 运行脚本
 完成上述所有操作后运行`SpiderForPKUHole.py`即可  
-```
-python3 SpiderForPKUHole.py
+```shell
+python3 main.py
 ```
 
 # 其他
