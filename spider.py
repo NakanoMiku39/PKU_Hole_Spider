@@ -20,6 +20,7 @@ class spider:
         self.password = config['User']['password'] # 密码
         self.entries = config['User']['entries'] # 希望爬取的树洞数
         self.mode = config['User']['mode'] # 爬虫运行模式
+        self.timeout = config['User']['timeout'] # 树洞刷新间隔
         self.google = webdriver.Chrome(options=options)
         self.url = url
         self.conn = sqlite3.connect(db_name)
@@ -88,7 +89,7 @@ class spider:
     def realtime(self):      
         try:  
             while True:
-                time.sleep(20)
+                time.sleep(int(self.timeout))
                 refresh = self.google.find_element(By.CSS_SELECTOR, "span.icon.icon-refresh") 
                 refresh.click()
                 self.google.find_element(By.XPATH, "//div[contains(@class,'title-bar')]").click()
@@ -140,6 +141,7 @@ class spider:
             # 关闭sidebar
             close = sidebar.find_element(By.CSS_SELECTOR, "span.icon.icon-close") 
             close.click()
+            self.conn.commit()
             time.sleep(random.randint(1, 5))
             
     def __del__(self):
